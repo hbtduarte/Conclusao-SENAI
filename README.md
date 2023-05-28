@@ -2,7 +2,7 @@
 
 Projeto com o microcontrolador arduíno MEGA2560, utilizando linguagem de programação C.
 
-Esse projeto consiste em um protótipo desenvolvido para instituições para facilitar o acesso e organização a chaves.
+Esse projeto consiste em um protótipo desenvolvido para instituições para facilitar o acesso e organização das chaves.
 
 - Há uma inteface com display e teclado na parte frontal do claviculário para o usuário digitar sua senha;
 - Um servomotor em posição que trava a porta do claviculário;

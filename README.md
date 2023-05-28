@@ -1,2 +1,3 @@
 # Projeto Claviculário Eletrônico
-Código em C usado no TCC de eletroeletrônica
+
+Projeto com o microcontrolador arduíno MEGA2560, utilizando linguagem de programação C.

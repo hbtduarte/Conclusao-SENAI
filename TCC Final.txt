@@ -1,0 +1,1206 @@
+
+// Inclusão de bibliotecas 
+
+#include<LiquidCrystal_I2C.h>                   // LCD I2C
+#include <Wire.h>                               // I2C
+#include <Keypad.h>                             // Teclado
+#include <Servo.h>                              // Servomotor
+#include "RTClib.h"                             // Relógio
+#include <SdFat.h>                              // SD
+#include <SPI.h>                                // SPI
+
+
+
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+// Definições de funções
+
+int chamaSenha();                         // Função para digitação da senha
+void verificaSenha(int verifica);         // Função para verificar a senha
+void verificaSensPorta(int porta);        // Função para monitorar o sensor da porta
+void verificaChave(String usuario);       // Função para monitorar as chaves 
+
+
+
+
+
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+// Definições de variáveis do programa
+
+#define sensorporta 3 
+#define chave1 10 
+#define chave2 11
+#define chave3 12 
+#define chave4 16
+#define chave5 17
+#define chave6 18
+#define servo 13
+#define buzzer 14
+#define sirene 15
+#define pinoSD 53
+ 
+#define negativo1 22
+#define negativo2 23
+#define negativo3 24
+#define negativo4 25
+#define negativo5 26
+#define negativo6 27
+#define negativo7 28
+#define negativo8 29
+#define negativo9 30
+#define negativo10 31
+#define negativo11 32
+#define negativo12 33
+
+#define positivo1 34 
+#define positivo2 35
+#define positivo3 36
+#define positivo4 37
+#define positivo5 38
+
+
+
+ int errosenhaloop=5;                // Variável para guardar estado do sensor da porta no looping caso a senha seja errada 
+ int travatela=2;                    // Variável para monitorar o looping para a função que monitora o sensor da porta
+ int monitorasensorporta=5;          // Variável para monitorar o sensor da porta 
+ int tempo= 200;                     // Variável para definir o tempo dos delays              
+ int i= 0;                           // Variável para incrementar contagem no looping da senha                   
+ int retornoerrado=0;                // Variável de looping caso a senha esteja errada (Função voidLoop e verificaSenha)
+ int senh=0;                         // Variável para mudar condição na comparação da senha (Função chamaSenha) (1= Certa; 2= Errada)
+ int pegachave1=2;                  // Variável para identificar na função 
+ int pegachave2=2;
+ int pegachave3=2;
+ int pegachave4=2;
+ int pegachave5=2;
+ int pegachave6=2;
+ 
+
+ SdFat sdCard;
+ SdFile meuArquivo;               // Objeto do SD
+ 
+
+ 
+RTC_DS3231 rtc;            // Objeto do tipo RTC_DS1307
+
+
+ String Hebert = "1111";          // Variável que armazena usuario
+ String Isadora = "2222";         // Variável que armazena usuario
+ String John = "3333";          // Variável que armazena usuario
+ String Paulo = "4444";         // Variável que armazena usuario
+
+// Simulação para usuários a mais
+
+ String USUARIO5 = "5555";
+ String USUARIO6 = "6666";
+ String USUARIO7 = "7777";
+
+
+ String usuario1= "";           // Variável dentro da função
+ String pass= "";           // Variável que guarda a digitação da senha
+ String passoculta= "";         // Variável que mostra no LCD de forma oculta
+
+
+
+
+ char dayOfTheWeek [7][12] = {"Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"};       // Declara dias da semana para instanciar no relógio
+
+
+
+ Servo servomotor;            // Para controlar o servo
+
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+// Definições do LCD
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+// Definições do teclado
+
+const byte Linhas  = 4;                                                                                      // Quantidade de linhas do teclado
+const byte Colunas = 4;                                                                                    // Quantidade de colunas do teclado
+byte PinosLinhas  [Linhas]  = {A0, A1, A2, A3};                                             // Pinos utilizados para o uso de linhas
+byte PinosColunas [Colunas] = {A5, A6, A7};                                                    // Pinos utilizados para o uso de colunas
+
+char matriz_teclas[Linhas][Colunas] =
+{
+  {'1','2','3','A'},
+  {'4','5','6','B'},                                                            // Matriz dos caracteres do teclado
+  {'7','8','9','C'},
+  {'*','0','#','D'}                                                                                                                                                                                              
+ };                   
+
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+//INICIALIZAÇÃO DO TECLADO
+
+Keypad meuteclado = Keypad(makeKeymap(matriz_teclas), PinosLinhas, PinosColunas, Linhas, Colunas);  // Introduz a variável onde as teclas apertadas vão ser identificadas
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+//INICIO DO PROGRAMA
+void setup()
+{ 
+
+ Serial.begin(9600); 
+
+ pinMode(sensorporta, INPUT_PULLUP);
+ pinMode(chave1, INPUT_PULLUP);            
+ pinMode(chave2, INPUT_PULLUP);            
+ pinMode(chave3, INPUT_PULLUP);  
+ pinMode(chave4,INPUT_PULLUP);
+ pinMode(chave5,INPUT_PULLUP);      
+ pinMode(chave6,INPUT_PULLUP);     
+ pinMode(sirene, OUTPUT);              
+ pinMode(buzzer, OUTPUT);         
+ pinMode(servo, OUTPUT);
+ pinMode(pinoSD, OUTPUT);  
+ pinMode(negativo1,OUTPUT);
+ pinMode(negativo2,OUTPUT);
+ pinMode(negativo3,OUTPUT);
+ pinMode(negativo4,OUTPUT);   
+ pinMode(negativo5,OUTPUT);
+ pinMode(negativo6,OUTPUT);
+ pinMode(negativo7,OUTPUT);   
+ pinMode(negativo8,OUTPUT);      
+ pinMode(negativo9,OUTPUT);    
+ pinMode(negativo10,OUTPUT);
+ pinMode(negativo11,OUTPUT);
+ pinMode(negativo12,OUTPUT);
+ pinMode(positivo1,OUTPUT);
+ pinMode(positivo2,OUTPUT);
+ pinMode(positivo3,OUTPUT);
+ pinMode(positivo4,OUTPUT);
+ pinMode(positivo5,OUTPUT);
+/*----------------------------------------------------------------------------------------- SERVO --------------------------------------------------------------------*/
+
+ servomotor.attach(servo, 500, 2500);           // Associa a posição ao servomotor
+ servomotor.write(0);                           // Inicia servomotor na posição zero
+
+
+/*----------------------------------------------------------------------------------------- RTCC --------------------------------------------------------------------*/ 
+
+  if (! rtc.begin())                               // Se o RTC não for inicializado
+  { 
+  if(! rtc.begin())                              // SE O RTC NÃO FOR INICIALIZADO, FAZ
+  {
+    Serial.println("DS3231 não encontrado");    //IMPRIME O TEXTO NO MONITOR SERIAL
+    while(1); //SEMPRE ENTRE NO LOOP
+  }
+  if(rtc.lostPower())                           //SE RTC FOI LIGADO PELA PRIMEIRA VEZ / FICOU SEM ENERGIA / ESGOTOU A BATERIA, FAZ
+  { 
+    Serial.println("DS3231 OK!");               //IMPRIME O TEXTO NO MONITOR SERIAL
+    
+                                                //REMOVA O COMENTÁRIO DE UMA DAS LINHAS ABAIXO PARA INSERIR AS INFORMAÇÕES ATUALIZADAS EM SEU RTC
+                                      
+    //rtc.adjust(DateTime(F(__DATE__), F(__TIME__))); //CAPTURA A DATA E HORA EM QUE O SKETCH É COMPILADO
+   // rtc.adjust(DateTime(2022, 11, 4, 10, 41, 00)); //(ANO), (MÊS), (DIA), (HORA), (MINUTOS), (SEGUNDOS)
+  }
+
+
+}
+ 
+
+
+/*----------------------------------------------------------------------------------------- SD --------------------------------------------------------------------*/ 
+
+
+  // Inicializa o modulo SD
+  if(!sdCard.begin(pinoSD,SPI_HALF_SPEED))sdCard.initErrorHalt();
+  
+  // Abre o arquivo banco_dados.txt
+  if (!meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END))
+  {
+    sdCard.errorHalt("Erro na abertura do arquivo banco_dados.TXT!");
+  }
+
+/*----------------------------------------------------------------------------------------- LCD --------------------------------------------------------------------*/
+
+  lcd.init();               // Comandos para iniciar o LCD em I2C
+  lcd.backlight();
+}
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+void loop()
+{
+ 
+  
+   char tecla = meuteclado.getKey();        // Armazena em uma variável as teclas apertadas       
+   
+  
+
+  
+/*----------------------------- Inter-travamento de lógicas para não ficar dando frame no LCD por causa do looping------------------------------------------------------------------------------------------------------------*/ 
+  
+  if (digitalRead(sensorporta)==1 && tecla== '*')   // Monitorar o sensor da porta e deixar o programa rodar caso estiver fechada & tecla para não ficar retornando e LCD ficar em looping  
+  {
+        retornoerrado=0;        // Voltar variável para 0 para quando der o looping o código rode normalmente caso ela mude de estado posteriormente 
+        travatela=0;          // Voltar variável para condição que permita que o "if" da função 'verificaSensPorta' rode normalmente
+        monitorasensorporta=1;      // Mude variável para 1 para entender que a porta está fechada
+  }
+      
+  
+  
+    if (digitalRead(sensorporta)==0 && senh==2 && travatela==1)     // Para o código entender que a porta foi aberta mas a senha digitada foi incorreta
+  {
+    travatela=1;              // Passa intertravamento para 1
+    monitorasensorporta=0;          // Passa variável que identifica o estado do sensor para 0
+  }
+  
+  
+  
+  if (digitalRead(sensorporta)==0 && senh==0 && travatela==1)     // Para o código entender que a porta foi aberta mas não foi digitada nenhuma senha correta
+  {
+    travatela=1;              // Passa intertravamento para 1
+    monitorasensorporta=0;          // Passa variável que identifica o estado do sensor para 0
+  }
+  
+    if (digitalRead(sensorporta)==1 && senh==1)       // Se o sensor da porta estiver fechada e a senha for correta   
+  {
+    travatela=0;              // Passa intertravamento para 0
+    monitorasensorporta=1;          // Passa variável que identifica o estado do sensor para 1 
+  }
+
+      if (digitalRead(sensorporta)==0 && senh==1 && travatela==1)     // Para entender que a porta foi aberta porque o usuário entrou com uma senha     
+  {
+    travatela=1;              // Passa intertravamento para 1
+    monitorasensorporta=0;          // Passa variável que identifica o estado do sensor para 0
+  }
+
+ 
+  if (digitalRead(sensorporta)==1 && monitorasensorporta==0)      // Para o código realmente entender se a porta está aberta ou fechada
+  { 
+            monitorasensorporta=1;
+    
+      }
+
+
+    if (monitorasensorporta==1 && senh==1)          // Condição de reset para resetar a senha caso ela seja digitada corretamente 
+    {
+         senh=0;
+    }
+
+
+   verificaSensPorta(monitorasensorporta);         // Chama função e passa o argumento para ela verificar se a porta está aberta ou não 
+    
+  
+  
+    verificaChave(pass);//CHAMAR FUNÇÃO
+  
+  
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/     
+
+  
+    if (tecla !=  NO_KEY)         // Se o teclado não for apertado 
+    {
+
+       
+    if (tecla == '*')         // Caso o usuário apertar *           
+    {
+      
+          while (retornoerrado==0)          // Looping para retornar a digitação caso usuário digite a senha incorreta
+          {
+            errosenhaloop=0;          // Variável que identifica que a senha foi digitada incorretamente em valor 0 (reset)
+            i = 0;            // Inicializa variável "i" como 0
+            lcd.clear();
+        pass= "";           // Passa a string para vazio
+        passoculta="";
+              
+                     if (monitorasensorporta==1)          // Para verificar se a porta ainda está fechada e continuar o código
+                      {
+                chamaSenha();         // Chama a função da senha
+          int retornoSenha= chamaSenha();                                     // Variável definida nessa linha que recebe o retorno da função chamaSenha
+                        verificaSenha(retornoSenha);                       // Chama função para verificar a senha e passa como argumento o que foi recebido da função anterior
+                     }
+              
+
+      
+          
+                 else if (monitorasensorporta==0)       // Para interromper o looping caso a porta seja aberta 
+                  {
+                    retornoerrado=1;          // Mudar variável para parar o looping 
+                    travatela=1;          // Mudar o estado da variável para condição que permita que o "if" da função 'verificaSensPorta' rode normalmente
+          verificaSensPorta(monitorasensorporta);     // Chama função e passa o argumento para função entender que a porta foi aberta 
+                  }
+          
+    
+    }
+    }
+  
+        }}
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/  
+// Funções
+
+
+ int chamaSenha()
+ {
+
+   
+  while (i<4 && monitorasensorporta==1 )              // Looping da variável i para o número de digitos da senha se limitar a 4 e permitir o looping apenas enquanto porta estiver fechada
+  {
+
+  
+    lcd.setCursor (0,0);          // Limpa o LCD pois havia caracteres ou números anteriormente 
+    lcd.print ("Digite a senha:  ");
+
+    char tecla = meuteclado.getKey();     // Armazena em uma variável as teclas apertadas (novamente pois anteriormente era em outra função)
+      
+      
+          if (digitalRead(sensorporta)==1)      // Verifica se a porta ainda está fechada
+      {
+
+    monitorasensorporta=1;        // Passa argumento para variável 
+      }
+      
+      if (digitalRead(sensorporta)==0)    // Verifica se a porta foi aberta 
+      {
+
+    monitorasensorporta=0;        // Passa argumento para variável 
+      }
+
+      
+    if (tecla != NO_KEY)          // Se o teclado não for apertado 
+    { 
+                
+        lcd.setCursor (0,1);              // Posiciona o cursor do LCD
+      pass+= tecla;           // Adiciona o que foi teclado na string "pass"
+      passoculta+= '*';           // Adiciona "*" a string "passoculta" para não ser visto no LCD a senha digitada
+            digitalWrite(buzzer, HIGH);
+            delay(50);
+            digitalWrite(buzzer, LOW);
+      lcd.print(passoculta);            // Mostra no LCD o que foi digitado
+          i++;              // Incrementa 1 na variável "i" para continuar o looping
+      
+            }
+
+  }
+
+
+  if (pass == Hebert || pass == Isadora || pass== John || pass== Paulo) //|| Isadora || John || Paulo)              // Condição que verifica se a senha foi digitada corretamente para retornar um argumento
+  {
+        senh= 1;              // Variável que passa como "true" se a senha foi digitada corretamente        
+    return senh;            // Retorna a variável para a função
+  }
+  
+  if ((pass != Hebert || pass!= Isadora || pass!= John || pass!= Paulo) && i==4)            // Condição que verifica se a senha foi digitada incorretamente para retornar um argumento
+                  {
+      senh= 2;              // Variável que passa como "false" se a senha foi digitada incorretamente
+    return senh;            // Retorna a variável para a função
+                   }
+
+
+   }
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/ 
+
+ void verificaSenha(int verifica)
+{ 
+
+   
+  if (verifica== 1)           // Condição que verifica se a senha foi digitada corretamente para tomar uma ação
+  {
+      lcd.clear();          // Indica pro usúario no LCD que a senha foi digitada corretamente
+      lcd.setCursor(0,0);
+      lcd.print("Senha correta.");
+      lcd.setCursor(3,1);
+      lcd.print("Aberto!");
+      delay(5000); 
+    
+      
+            retornoerrado=1;        // Muda estado para sair da condição que está habilitada em looping no 0
+                  monitorasensorporta=4;      // Muda estado para identificar que a porta vai ser aberta porque a senha foi digitada corretamente 
+              servomotor.write(90);
+
+
+             if (monitorasensorporta==1)
+             {
+                   monitorasensorporta=5;   // Muda estado da variável do sensor da porta caso a porta ainda esteja fechada 
+              }
+            
+  }
+
+  else if (verifica== 2)            // Condição que verifica se a senha foi digitada corretamente para tomar uma ação
+  { 
+      
+      
+    lcd.clear();          // Indica pro usúario no LCD que a senha foi digitada incorretamente e pede para tentar novamente em segundos
+      lcd.setCursor(0,0);
+      lcd.print("Senha incorreta");
+      lcd.setCursor(0,1);
+            lcd.print("Tente novamente");
+        delay(1000);
+            lcd.clear();
+          lcd.print("3...");
+          delay(1000);
+            lcd.clear();
+          lcd.print("2..."); 
+            delay(1000);
+            lcd.clear();
+          lcd.print("1...");
+            delay(1000);
+        
+          errosenhaloop=1;          // Variável que identifica que a senha foi digitada incorretamente
+
+
+  }
+
+} 
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/ 
+
+void verificaSensPorta(int porta)
+{
+
+  
+  if ((porta==1 || porta==5) && (travatela== 0 || travatela==2 || errosenhaloop==5))      // Se receber argumento que o sensor de porta está fechada e as variáveis de travar tela estiverem em 0 ou 2 (o 2 é no caso da inicialização)
+  {
+          lcd.clear();            
+          lcd.setCursor(0,0);
+          lcd.print("Pressione * para");
+          lcd.setCursor(0,1);
+          lcd.print("digitar senha");
+          delay(001);
+      
+          travatela=1;                  // Troca variável de estado para permitir que o código entenda que a porta está fechada 
+        
+            servomotor.write(0);                // Troca o estado do servo para 0° (fechar o trinco)
+            errosenhaloop=0;                // Troca variável permitir condição de intertravamento de lógica
+      
+           pass="";
+      
+  }
+
+
+  else if ((porta==0 || porta==4) && (travatela==1 || travatela==2) && (senh==0 || senh==2 || errosenhaloop==5))    // Condições que entendem o estado do sensor da porta e se a senha foi digitada corretamente 
+  {
+         lcd.clear();
+         lcd.setCursor(0,0);
+         lcd.print("Porta aberta!");
+         lcd.setCursor(0,1);
+         lcd.print("ERRO!");
+         delay(tempo);
+      
+         travatela=0;                     // Troca variável de estado para permitir que o código não entre em looping no LCD
+      
+      
+           errosenhaloop=7;                   // Troca variável para número aleatório 
+
+
+
+          digitalWrite (sirene, HIGH);
+          delay(1000);
+
+  }   
+
+}
+
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/   
+
+void verificaChave (String usuario)
+{  
+
+
+
+  // Roda o tempo do RTC
+  
+    DateTime now = rtc.now();             //CHAMADA DE FUNÇÃO
+    Serial.print("Data: ");               //IMPRIME O TEXTO NO MONITOR SERIAL
+    Serial.print(now.day(), DEC);         //IMPRIME NO MONITOR SERIAL O DIA
+    Serial.print('/');                     //IMPRIME O CARACTERE NO MONITOR SERIAL
+    Serial.print(now.month(), DEC);        //IMPRIME NO MONITOR SERIAL O MÊS
+    Serial.print('/');            //IMPRIME O CARACTERE NO MONITOR SERIAL
+    Serial.print(now.year(), DEC);        //IMPRIME NO MONITOR SERIAL O ANO
+    Serial.print(" / Dia: ");           //IMPRIME O TEXTO NA SERIAL
+    Serial.print(dayOfTheWeek[now.dayOfTheWeek()]);    //IMPRIME NO MONITOR SERIAL O DIA
+    Serial.print(" / Horas: ");           //IMPRIME O TEXTO NA SERIAL
+    Serial.print(now.hour(), DEC);        //IMPRIME NO MONITOR SERIAL A HORA
+    Serial.print(':');            //IMPRIME O CARACTERE NO MONITOR SERIAL
+    Serial.print(now.minute(), DEC);        //IMPRIME NO MONITOR SERIAL OS MINUTOS
+    Serial.print(':');            //IMPRIME O CARACTERE NO MONITOR SERIAL
+    Serial.print(now.second(), DEC);        //IMPRIME NO MONITOR SERIAL OS SEGUNDOS
+    Serial.println();             //QUEBRA DE LINHA NA SERIAL
+
+ 
+/*----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+// IDENTIFICAÇÃO DE USUÁRIOS 
+
+
+    if (usuario == Hebert )
+    {
+       usuario1= "Hebert";
+
+    
+    }
+  
+    if (usuario == Isadora )
+    {
+       usuario1= "Isadora";
+    
+    
+    }
+  
+      if (usuario == John)
+    {
+       usuario1= "John";
+
+      
+    }
+  
+     if (usuario == Paulo )
+    {
+      
+       usuario1= "Paulo";
+  
+      
+    }
+
+         if (usuario == USUARIO5 )
+    {
+      
+       usuario1= "USUARIO5";
+  
+      
+    }
+
+         if (usuario == USUARIO6 )
+    {
+      
+       usuario1= "USUARIO6";
+  
+      
+    }
+
+         if (usuario == USUARIO7 )
+    {
+      
+       usuario1= "USUARIO7";
+  
+      
+    }
+    
+  
+     if ((travatela==1 || travatela==2) && senh==1)         // Se receber argumento que o sensor de porta está fechada e as variáveis de travar tela estiverem em 1 ou 2 (o 2 é no caso da inicialização)
+  {
+      
+         lcd.clear();
+         lcd.setCursor(0,0);
+         lcd.print("Porta aberta!");
+         lcd.setCursor(0,1);
+         lcd.print("Bem vindo");
+         lcd.setCursor(10,1);
+         lcd.print(usuario1);          
+       
+         delay(tempo);
+
+         travatela=0;                     // Troca variável de estado para permitir que o código não entre em looping no LCD
+         
+
+         errosenhaloop=0;                   // Troca variável permitir condição de intertravamento de lógica
+  
+  
+   }
+ 
+/*------------------------------------------------------------------ CHAVE 1----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/ 
+  
+    if (digitalRead (chave1)==1 && pegachave1==2)       // Pegou a chave
+        {
+          pegachave1=1;
+        }
+  
+    if (digitalRead (chave1)==0 && pegachave1==2)       // Devolveu a chave 
+        {
+          pegachave1=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave1)==1 &&  pegachave1==0  && senh==1)      // Pegou a CHAVE 1
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 1");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 1");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                          
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave1=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave1)==0 && pegachave1==1 && senh==1)   // Devolveu a CHAVE 1
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 1");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 1");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave1=0;
+           
+        
+                
+
+    }
+
+
+/*------------------------------------------------------------------ CHAVE 2----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/ 
+ 
+    if (digitalRead (chave2)==1 && pegachave2==2)       // Pegou a chave
+        {
+          pegachave2=1;
+        }
+  
+    if (digitalRead (chave2)==0 && pegachave2==2)       // Devolveu a chave 
+        {
+          pegachave2=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave2)==1 &&  pegachave2==0  && senh==1)      // Pegou a CHAVE 2
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 2");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 2");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                        
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave2=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave2)==0 && pegachave2==1 && senh==1)   // Devolveu a CHAVE 2
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 2");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 2");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave2=0;
+    }
+/*------------------------------------------------------------------ CHAVE 3----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------*/ 
+ 
+ if (digitalRead (chave3)==1 && pegachave3==2)       // Pegou a chave
+        {
+          pegachave3=1;
+        }
+  
+    if (digitalRead (chave3)==0 && pegachave3==2)       // Devolveu a chave 
+        {
+          pegachave3=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave3)==1 &&  pegachave3==0  && senh==1)      // Pegou a CHAVE 2
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 3");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 3");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                        
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave3=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave3)==0 && pegachave3==1 && senh==1)   // Devolveu a CHAVE 3
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 3");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 3");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave3=0;
+
+    }
+
+/*-------------------------------------------------------------------------chave 4---------------------------------------------------------------------------------------------------------------------------------------------------*/
+
+
+
+ if (digitalRead (chave4)==1 && pegachave4==2)       // Pegou a chave
+        {
+          pegachave4=1;
+        }
+  
+    if (digitalRead (chave4)==0 && pegachave4==2)       // Devolveu a chave 
+        {
+          pegachave4=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave4)==1 &&  pegachave4==0  && senh==1)      // Pegou a CHAVE 4
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 4");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 4");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                        
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave4=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave4)==0 && pegachave4==1 && senh==1)   // Devolveu a CHAVE 4
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 4");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 4");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave4=0;
+
+    }
+
+
+/*-----------------------------------------------------------------------------------------------------------------chave 5--------------------------------------------------------------------------------------------------------------*/
+
+
+
+ if (digitalRead (chave5)==1 && pegachave5==2)       // Pegou a chave
+        {
+          pegachave5=1;
+        }
+  
+    if (digitalRead (chave5)==0 && pegachave5==2)       // Devolveu a chave 
+        {
+          pegachave5=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave5)==1 &&  pegachave5==0  && senh==1)      // Pegou a CHAVE 5
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 5");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 5");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                        
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave5=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave5)==0 && pegachave5==1 && senh==1)   // Devolveu a CHAVE 4
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 5");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 5");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave5=0;
+
+
+    }
+
+
+
+/*-------------------------------------------------------------------------------------------------------------------chave 6----------------------------------------------------------------------------------------------------------*/
+
+
+
+ if (digitalRead (chave6)==1 && pegachave6==2)       // Pegou a chave
+        {
+          pegachave6=1;
+        }
+  
+    if (digitalRead (chave6)==0 && pegachave6==2)       // Devolveu a chave 
+        {
+          pegachave6=0;
+        }
+
+
+
+
+    
+
+    if( digitalRead (chave6)==1 &&  pegachave6==0  && senh==1)      // Pegou a CHAVE 5
+    { 
+
+                 DateTime now = rtc.now(); 
+
+                 Serial.print(usuario1);
+                 Serial.println(" pegou a chave 6");
+ 
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" pegou a chave 6");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                        
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+             
+ 
+    
+                  pegachave6=1;
+          
+
+    }
+
+  
+
+    if (digitalRead (chave6)==0 && pegachave6==1 && senh==1)   // Devolveu a CHAVE 6
+    { 
+
+
+      
+                 DateTime now = rtc.now(); 
+                 
+
+
+                 Serial.print(usuario1);
+                 Serial.println(" devolveu a chave 6");
+        
+                 // Grava dados dos sensores em banco_dados.TXT
+                 meuArquivo.open("banco_dados.txt", O_RDWR | O_CREAT | O_AT_END);
+                 meuArquivo.print(usuario1);
+                 meuArquivo.println(" devolveu a chave 6");
+                 meuArquivo.print("Data: ");               
+                 meuArquivo.print(now.day(), DEC);         
+                 meuArquivo.print('/');                     
+                 meuArquivo.print(now.month(), DEC);        
+                 meuArquivo.print('/');            
+                 meuArquivo.print(now.year(), DEC);        
+                 meuArquivo.print(" / Dia: ");           
+                 meuArquivo.print(dayOfTheWeek[now.dayOfTheWeek()]);    
+                 meuArquivo.print(" / Horas: ");           
+                 meuArquivo.print(now.hour(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.minute(), DEC);        
+                 meuArquivo.print(':');            
+                 meuArquivo.print(now.second(), DEC);        
+                 meuArquivo.println();                         
+                 meuArquivo.close();                                                 // Fecha o Arquivo após escrever
+                 Serial.println("Terminado.");                                   // Imprime na tela
+                 Serial.println(" ");
+        
+                 pegachave6=0;
+
+
+
+    }
+
+
+} // ULTIMA QUEBRA
+
+
+      
+
+
+
+
+
+
+
+ 
